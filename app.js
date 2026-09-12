@@ -1,6 +1,6 @@
 /**
  * Study Reader — Core Application Logic
- * A clean, distraction-free HTML study document reader with integrated Read Aloud.
+ * A clean, distraction-free HTML and Markdown study document reader with integrated Read Aloud and HTML Export.
  */
 
 (function () {
@@ -27,6 +27,9 @@
 
   let currentScale = DEFAULT_STATE.scale;
 
+  // Track loaded document state for export and metadata
+  let currentDocumentState = null; // { title: string, filename: string, isMarkdown: boolean }
+
   // --- Read Aloud State ---
   const speechSupported = ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window);
   let speechState = 'idle'; // 'idle' | 'speaking' | 'paused'
@@ -40,6 +43,7 @@
   const htmlRoot = document.documentElement;
   const fileInput = document.getElementById('fileInput');
   const openFileBtn = document.getElementById('openFileBtn');
+  const exportHtmlBtn = document.getElementById('exportHtmlBtn');
   const emptyOpenBtn = document.getElementById('emptyOpenBtn');
   const dropCard = document.getElementById('dropCard');
   const dragOverlay = document.getElementById('dragOverlay');
@@ -147,7 +151,6 @@
     currentScale = Math.max(SCALE_MIN, Math.min(SCALE_MAX, scaleVal));
     htmlRoot.style.setProperty('--reader-scale', (currentScale / 100).toString());
     sizeIndicator.textContent = `${currentScale}%`;
-
     try {
       localStorage.setItem(STORAGE_KEYS.FONT_SIZE, currentScale.toString());
     } catch (e) {
@@ -434,7 +437,7 @@
     }
 
     if (readerContainer.hidden || !readerContent || readerContent.textContent.trim().length === 0) {
-      showToast('Open an HTML study document first to start Read Aloud.', true);
+      showToast('Open a study document first to start Read Aloud.', true);
       return;
     }
 
@@ -557,35 +560,230 @@
     }
   }
 
+  // --- Markdown Parser & Extractor (Adapted from markdown-to-html-cli) ---
+
+  /**
+   * Minimal zero-dependency Markdown parser.
+   * Converts raw Markdown syntax into structured HTML.
+   */
+  function parseMarkdown(md) {
+    if (!md) return '';
+    let html = md;
+
+    // 1. Fenced code blocks with language support & HTML entity escaping
+    // Use unique tokens without underscores or asterisks to avoid collisions with bold/italic parsing
+    const codeBlocks = [];
+    html = html.replace(/```([a-zA-Z0-9_-]*)\r?\n([\s\S]*?)```/g, (match, lang, code) => {
+      const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const token = `%%CODEBLOCK${codeBlocks.length}%%`;
+      codeBlocks.push(`<pre><code class="language-${lang || 'text'}">${escaped}</code></pre>`);
+      return token;
+    });
+
+    // 2. Inline code with HTML entity escaping
+    const inlineCodes = [];
+    html = html.replace(/`([^`\r\n]+)`/g, (match, code) => {
+      const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const token = `%%INLINECODE${inlineCodes.length}%%`;
+      inlineCodes.push(`<code>${escaped}</code>`);
+      return token;
+    });
+
+    // 3. Headings (h6 down to h1)
+    html = html.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
+    html = html.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>');
+    html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
+
+    // 4. Horizontal rules
+    html = html.replace(/^(?:---|\*\*\*|___)\s*$/gm, '<hr />');
+
+    // 5. Blockquotes
+    html = html.replace(/^>\s+(.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // 6. Bold & Italic
+    html = html.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    html = html.replace(/___([^_]+)___/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+    // 7. Images & Links
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />');
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // 8. Lists (Unordered & Ordered)
+    html = html.replace(/^\s*[-*+]\s+(.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\r?\n?)+/g, '<ul>$&</ul>');
+
+    html = html.replace(/^\s*\d+\.\s+(.+)$/gm, '<oli>$1</oli>');
+    html = html.replace(/(<oli>.*<\/oli>\r?\n?)+/g, (match) => {
+      return '<ol>' + match.replace(/<\/?oli>/g, (m) => m === '<oli>' ? '<li>' : '</li>') + '</ol>';
+    });
+
+    // 9. Paragraphs
+    const lines = html.split(/\r?\n\r?\n/);
+    const processed = lines.map(block => {
+      block = block.trim();
+      if (!block) return '';
+      if (
+        block.startsWith('<h') ||
+        block.startsWith('<ul') ||
+        block.startsWith('<ol') ||
+        block.startsWith('<blockquote') ||
+        block.startsWith('<hr') ||
+        block.startsWith('%%CODEBLOCK')
+      ) {
+        return block;
+      }
+      return `<p>${block.replace(/\r?\n/g, '<br />')}</p>`;
+    });
+    html = processed.join('\n\n');
+
+    // 10. Restore code blocks & inline codes
+    codeBlocks.forEach((block, idx) => {
+      html = html.replace(`%%CODEBLOCK${idx}%%`, block);
+    });
+    inlineCodes.forEach((code, idx) => {
+      html = html.replace(`%%INLINECODE${idx}%%`, code);
+    });
+
+    return html;
+  }
+
+  /**
+   * Extracts the document title from raw Markdown (first # Heading, or falls back to filename)
+   */
+  function extractMarkdownTitle(rawMarkdown, filename) {
+    if (rawMarkdown) {
+      const h1Match = rawMarkdown.match(/^#\s+(.+)$/m);
+      if (h1Match && h1Match[1].trim()) {
+        return h1Match[1].trim().replace(/[*_`]/g, '');
+      }
+    }
+    return filename.replace(/\.(md|markdown|html|htm)$/i, '');
+  }
+
   // --- File Verification & Reading ---
-  function isValidHtmlFile(file) {
+  function isValidFile(file) {
     if (!file) return false;
     const name = file.name.toLowerCase();
-    return name.endsWith('.html') || name.endsWith('.htm') || file.type === 'text/html';
+    return (
+      name.endsWith('.html') ||
+      name.endsWith('.htm') ||
+      name.endsWith('.md') ||
+      name.endsWith('.markdown') ||
+      file.type === 'text/html' ||
+      file.type === 'text/markdown' ||
+      file.type === 'text/plain'
+    );
+  }
+
+  function isMarkdownFile(filename) {
+    if (!filename) return false;
+    const lower = filename.toLowerCase();
+    return lower.endsWith('.md') || lower.endsWith('.markdown');
   }
 
   function handleFile(file) {
     if (!file) return;
 
-    if (!isValidHtmlFile(file)) {
-      showToast(`"${file.name}" is not an HTML file. Please select a .html or .htm file.`, true);
+    if (!isValidFile(file)) {
+      showToast(`"${file.name}" is not a supported file. Please select a .html, .htm, .md, or .markdown file.`, true);
       return;
     }
 
     hideToast();
     stopReading(); // Halt ongoing speech before opening new document
 
+    const isMd = isMarkdownFile(file.name);
     const reader = new FileReader();
+
     reader.onload = function (e) {
       const content = e.target.result;
-      processHtmlContent(content, file.name);
+      if (isMd) {
+        processMarkdownContent(content, file.name);
+      } else {
+        processHtmlContent(content, file.name);
+      }
     };
 
     reader.onerror = function () {
       showToast(`Failed to read "${file.name}". Please check file permissions and try again.`, true);
     };
 
-    reader.readAsText(file);
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  // --- Markdown Processing & Rendering Pipeline ---
+  function processMarkdownContent(rawMarkdown, filename) {
+    try {
+      stopReading();
+
+      // Extract title from top-level # heading if present
+      const extractedTitle = extractMarkdownTitle(rawMarkdown, filename);
+
+      // Parse Markdown into semantic HTML markup
+      const convertedHtml = parseMarkdown(rawMarkdown);
+
+      // Pass generated HTML directly through the authoritative DOMParser & sanitization pipeline
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<!DOCTYPE html><html><head><title>${extractedTitle}</title></head><body><main>${convertedHtml}</main></body></html>`, 'text/html');
+
+      // Extract content root and sanitize node tree
+      const contentRoot = doc.body || doc.documentElement;
+      const sanitizedContainer = sanitizeAndFormatTree(contentRoot);
+
+      // Render into reader
+      readerContent.innerHTML = '';
+      readerContent.appendChild(sanitizedContainer);
+
+      // Post-process: wrap tables for horizontal scroll
+      wrapTables(readerContent);
+
+      // Extract speech chunks for reading aloud
+      extractSpeechChunks();
+
+      // Update Header info & Document Metadata
+      currentFileName.textContent = filename;
+      currentFileName.title = `${filename} (${extractedTitle})`;
+      fileBadgeContainer.hidden = false;
+      document.title = `${extractedTitle} — Study Reader`;
+
+      // Track loaded state
+      currentDocumentState = {
+        title: extractedTitle,
+        filename: filename,
+        isMarkdown: true
+      };
+
+      // Calculate stats
+      updateDocumentStats(readerContent.textContent || '', filename, true);
+
+      // Display Export HTML action
+      if (exportHtmlBtn) {
+        exportHtmlBtn.hidden = false;
+        exportHtmlBtn.style.display = 'inline-flex';
+      }
+
+      // Show reader view & smooth scroll to top
+      emptyState.hidden = true;
+      readerContainer.hidden = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (err) {
+      console.error('Error processing Markdown:', err);
+      showToast(`Could not process "${filename}". The file content could not be rendered.`, true);
+    }
   }
 
   // --- HTML Parsing, Sanitization & Content Extraction ---
@@ -628,8 +826,21 @@
       fileBadgeContainer.hidden = false;
       document.title = `${extractedTitle} — Study Reader`;
 
+      // Track loaded state
+      currentDocumentState = {
+        title: extractedTitle,
+        filename: filename,
+        isMarkdown: false
+      };
+
       // Calculate stats
-      updateDocumentStats(readerContent.textContent || '', filename);
+      updateDocumentStats(readerContent.textContent || '', filename, false);
+
+      // Display Export HTML action
+      if (exportHtmlBtn) {
+        exportHtmlBtn.hidden = false;
+        exportHtmlBtn.style.display = 'inline-flex';
+      }
 
       // Show reader view & smooth scroll to top
       emptyState.hidden = true;
@@ -749,7 +960,7 @@
           continue;
         }
 
-        // Link handling
+        // Link handling: enforce safe protocol & target blank
         if (attrName === 'href' && tagName === 'a') {
           const trimmed = attrVal.trim().toLowerCase();
           if (trimmed.startsWith('javascript:') || trimmed.startsWith('vbscript:') || trimmed.startsWith('data:text/html')) {
@@ -761,7 +972,7 @@
           continue;
         }
 
-        // Image handling
+        // Image handling: enforce safe image source
         if (attrName === 'src' && (tagName === 'img' || tagName === 'source')) {
           const trimmed = attrVal.trim().toLowerCase();
           if (trimmed.startsWith('javascript:') || trimmed.startsWith('vbscript:')) {
@@ -817,7 +1028,7 @@
   /**
    * Calculate word count and estimated reading time
    */
-  function updateDocumentStats(text, filename) {
+  function updateDocumentStats(text, filename, isMarkdown = false) {
     const words = text.trim().split(/\s+/).filter(w => w.length > 0);
     const count = words.length;
     metaWordCount.textContent = `${count.toLocaleString()} words`;
@@ -825,8 +1036,196 @@
     const mins = Math.max(1, Math.ceil(count / 220));
     metaReadTime.textContent = `${mins} min read`;
 
-    const ext = filename.split('.').pop().toUpperCase();
-    metaFileType.textContent = `${ext} Study Document`;
+    if (isMarkdown) {
+      metaFileType.textContent = 'MARKDOWN STUDY DOCUMENT';
+    } else {
+      const ext = (filename.split('.').pop() || 'HTML').toUpperCase();
+      metaFileType.textContent = `${ext} STUDY DOCUMENT`;
+    }
+  }
+
+  /**
+   * Export cleaned document as a standalone, readable HTML file
+   */
+  function exportCleanHtml() {
+    if (!currentDocumentState || !readerContent) {
+      showToast('No study document is currently loaded to export.', true);
+      return;
+    }
+
+    try {
+      const docTitle = currentDocumentState.title || 'Study Document';
+      const bodyNode = readerContent.querySelector('.reader-body');
+      const bodyContent = bodyNode ? bodyNode.innerHTML : readerContent.innerHTML;
+
+      const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${docTitle}</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --text: #334155;
+      --text-heading: #0f172a;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --code-bg: #f1f5f9;
+      --code-border: #e2e8f0;
+      --border: #e2e8f0;
+      --quote-bg: #f8fafc;
+      --quote-border: #2563eb;
+      --quote-text: #64748b;
+      --table-border: #e2e8f0;
+      --table-header: #f8fafc;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1117;
+        --text: #e6edf3;
+        --text-heading: #f0f6fc;
+        --accent: #58a6ff;
+        --accent-hover: #79c0ff;
+        --code-bg: #161b22;
+        --code-border: #30363d;
+        --border: #30363d;
+        --quote-bg: #161b22;
+        --quote-border: #58a6ff;
+        --quote-text: #8b949e;
+        --table-border: #30363d;
+        --table-header: #161b22;
+      }
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--text);
+      background-color: var(--bg);
+      max-width: 860px;
+      margin: 40px auto;
+      padding: 0 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      color: var(--text-heading);
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+    }
+    h1 { font-size: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+    h2 { font-size: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+    h3 { font-size: 1.25rem; }
+    h4 { font-size: 1.1rem; }
+    h5, h6 { font-size: 1rem; }
+    p, ul, ol, dl, blockquote, pre, .table-wrapper {
+      margin-top: 0;
+      margin-bottom: 1.25rem;
+    }
+    ul, ol { padding-left: 1.75rem; }
+    li { margin-bottom: 0.35rem; }
+    a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+    a:hover { color: var(--accent-hover); }
+    code {
+      padding: 0.2em 0.4em;
+      font-size: 85%;
+      background-color: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
+    }
+    pre {
+      padding: 1.1rem 1.3rem;
+      overflow-x: auto;
+      font-size: 85%;
+      line-height: 1.5;
+      background-color: var(--code-bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    pre code {
+      padding: 0;
+      background: transparent;
+      border: none;
+      font-size: inherit;
+    }
+    blockquote {
+      padding: 0.75rem 1.25rem;
+      color: var(--quote-text);
+      background-color: var(--quote-bg);
+      border-left: 4px solid var(--quote-border);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+    }
+    hr {
+      height: 1px;
+      border: none;
+      background-color: var(--border);
+      margin: 2.25rem 0;
+    }
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--table-border);
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9em;
+      text-align: left;
+    }
+    th, td {
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--table-border);
+    }
+    th {
+      background-color: var(--table-header);
+      font-weight: 600;
+      color: var(--text-heading);
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      display: block;
+      margin: 1.5rem auto;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    ${bodyContent}
+  </main>
+</body>
+</html>`;
+
+      const baseFilename = currentDocumentState.filename || 'study-document';
+      const outputFilename = baseFilename.replace(/\.(md|markdown|html|htm)$/i, '') + '.html';
+
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = outputFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      showToast(`Exported "${outputFilename}" successfully.`, false);
+    } catch (err) {
+      console.error('Export HTML failed:', err);
+      showToast('Failed to export HTML document.', true);
+    }
   }
 
   // --- Drag and Drop Handlers ---
@@ -911,6 +1310,10 @@
 
     openFileBtn.addEventListener('click', triggerFileSelect);
     emptyOpenBtn.addEventListener('click', triggerFileSelect);
+
+    if (exportHtmlBtn) {
+      exportHtmlBtn.addEventListener('click', exportCleanHtml);
+    }
 
     fileInput.addEventListener('change', (e) => {
       if (e.target.files && e.target.files.length > 0) {

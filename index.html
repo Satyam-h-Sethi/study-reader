@@ -30,14 +30,23 @@
     </div>
 
     <div class="header-controls">
-      <!-- File Picker Trigger -->
-      <button type="button" class="btn btn-secondary" id="openFileBtn" title="Open an HTML file (Ctrl+O)">
+      <!-- File Actions -->
+      <button type="button" class="btn btn-secondary" id="openFileBtn" title="Open an HTML or Markdown file (Ctrl+O)">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           <line x1="12" y1="11" x2="12" y2="17"/>
           <line x1="9" y1="14" x2="15" y2="14"/>
         </svg>
         <span class="btn-text">Open File</span>
+      </button>
+
+      <button type="button" class="btn btn-secondary" id="exportHtmlBtn" title="Export cleaned standalone HTML" aria-label="Export HTML" style="display:none;">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span class="btn-text">Export HTML</span>
       </button>
 
       <!-- Font Size Controls -->
@@ -109,7 +118,7 @@
   </header>
 
   <!-- Hidden native file input -->
-  <input type="file" id="fileInput" accept=".html,.htm" style="display:none">
+  <input type="file" id="fileInput" accept=".html,.htm,.md,.markdown" style="display:none">
 
   <!-- Main View Area -->
   <main class="main-container">
@@ -134,7 +143,7 @@
 
         <h1 class="empty-title">Study Reader</h1>
         <p class="empty-subtitle">
-          Open an HTML study file from your computer<br>
+          Open an HTML or Markdown study file from your computer<br>
           and turn it into a comfortable reading experience.
         </p>
 
@@ -150,10 +159,12 @@
         </div>
 
         <div class="drop-hint">
-          <span class="drop-hint-text">or drag &amp; drop your HTML file anywhere</span>
+          <span class="drop-hint-text">or drag &amp; drop your study file anywhere</span>
           <div class="badge-row">
             <span class="file-type-chip">.html</span>
             <span class="file-type-chip">.htm</span>
+            <span class="file-type-chip">.md</span>
+            <span class="file-type-chip">.markdown</span>
           </div>
         </div>
 
@@ -164,7 +175,7 @@
           </div>
           <div class="feature-item">
             <span class="feature-icon">✦</span>
-            <span>Neutralizes clutter, scripts &amp; jarring page-wide styling</span>
+            <span>Supports HTML and Markdown (.md, .markdown) formats</span>
           </div>
           <div class="feature-item">
             <span class="feature-icon">✦</span>
@@ -200,7 +211,7 @@
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
       <p>Drop your study file here to read</p>
-      <span>Accepts .html and .htm files</span>
+      <span>Accepts .html, .htm, .md, and .markdown files</span>
     </div>
   </div>
 
