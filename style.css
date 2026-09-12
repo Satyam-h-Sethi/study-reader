@@ -1064,3 +1064,90 @@ body {
     height: 38px;
   }
 }
+
+/* --- Print Stylesheet for Offline Paper & PDF Export --- */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    font-size: 11pt !important;
+    line-height: 1.6 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .app-header,
+  .toast-banner,
+  .back-to-top,
+  .drag-overlay,
+  .empty-state {
+    display: none !important;
+  }
+
+  .main-container {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .reader-container {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .reader-meta {
+    border-bottom: 1px solid #d1d5db !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  .reader-content {
+    color: #111827 !important;
+  }
+
+  .reader-content h1,
+  .reader-content h2,
+  .reader-content h3,
+  .reader-content h4 {
+    color: #000000 !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .reader-content pre,
+  .reader-content blockquote,
+  .reader-content table,
+  .reader-content figure {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .reader-content pre {
+    background-color: #f3f4f6 !important;
+    border: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+  }
+
+  .reader-content code {
+    background-color: #f3f4f6 !important;
+    border-color: #e5e7eb !important;
+    color: #1f2937 !important;
+  }
+
+  .reader-content blockquote {
+    background-color: #f9fafb !important;
+    border-left-color: #4b5563 !important;
+    color: #374151 !important;
+  }
+
+  .reader-content table th {
+    background-color: #f3f4f6 !important;
+    color: #000000 !important;
+  }
+
+  .reader-content a {
+    color: #111827 !important;
+    text-decoration: underline !important;
+  }
+}

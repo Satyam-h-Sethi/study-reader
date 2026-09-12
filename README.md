@@ -44,6 +44,7 @@ Study Reader separates the underlying document structure from legacy presentatio
 - **Enhanced Typography**: Polished typography and spacing for headings, blockquotes, lists, and images.
 - **Responsive Tables & Code Blocks**: Code snippets use high-contrast monospaced styling; tables automatically wrap in scrollable containers to protect layout bounds.
 - **HTML Sanitization**: DOM parser filters dangerous tags (`<script>`, `<iframe>`, `<style>`, `<form>`) and strips inline `on*` event handlers.
+- **Print & PDF Optimization**: Clean `@media print` CSS rules that suppress interface controls and render crisp, high-contrast typography with page-break protection for offline reading and PDF export.
 - **Back-to-Top Navigation**: Smooth floating button for swift navigation through lengthy study documents.
 - **Zero Backend Required**: Fully client-side processing with zero third-party dependencies.
 
