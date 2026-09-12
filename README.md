@@ -74,6 +74,12 @@ Open your browser to:
 3. Click **Export HTML** to download the clean, standalone styled document.
 4. Use the floating **Back to Top** button to return to the document header.
 
+### Keyboard Shortcuts
+
+- <kbd>Ctrl</kbd> + <kbd>O</kbd> / <kbd>Cmd</kbd> + <kbd>O</kbd>: Open local study file picker
+- <kbd>Esc</kbd>: Dismiss notifications and stop active speech playback
+- <kbd>Ctrl</kbd> + <kbd>P</kbd> / <kbd>Cmd</kbd> + <kbd>P</kbd>: Clean print and PDF export with dedicated print layout
+
 ## Deployment
 
 Study Reader is deployed as a static site on **Cloudflare Pages**:
