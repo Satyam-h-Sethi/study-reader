@@ -36,7 +36,8 @@ Study Reader separates the underlying document structure from legacy presentatio
 - **Dark Mode by Default**: Tailored dark theme inspired by modern developer documentation, with a one-click Light/Dark theme toggle.
 - **Reading Width Modes**: Switch between **Compact** (680px), **Comfortable** (860px), and **Wide** (1140px) reading layouts.
 - **Adjustable Font Size**: Fine-tune typography scaling from 70% to 160% via responsive `A-` / `A+` controls.
-- **Preference Persistence**: Theme, reading width, and zoom preferences persist automatically across sessions via `localStorage`.
+- **Integrated Read Aloud**: Browser-native text-to-speech engine powered by the Web Speech API (`SpeechSynthesis`), prioritizing high-fidelity Microsoft Natural / Aria voices in Edge with adjustable speed (`0.75×` to `2×`), active paragraph highlighting, and auto-scrolling.
+- **Preference Persistence**: Theme, reading width, speech rate, and zoom preferences persist automatically across sessions via `localStorage`.
 - **Enhanced Typography**: Polished typography and spacing for headings, blockquotes, lists, and images.
 - **Responsive Tables & Code Blocks**: Code snippets use high-contrast monospaced styling; tables automatically wrap in scrollable containers to protect layout bounds.
 - **HTML Sanitization**: DOM parser filters dangerous tags (`<script>`, `<iframe>`, `<style>`, `<form>`) and strips inline `on*` event handlers.

@@ -1,6 +1,6 @@
 /**
  * Study Reader — Core Application Logic
- * A clean, distraction-free HTML study document reader.
+ * A clean, distraction-free HTML study document reader with integrated Read Aloud.
  */
 
 (function () {
@@ -10,13 +10,15 @@
   const STORAGE_KEYS = {
     THEME: 'study_reader_theme',
     WIDTH: 'study_reader_width',
-    FONT_SIZE: 'study_reader_font_size'
+    FONT_SIZE: 'study_reader_font_size',
+    SPEECH_RATE: 'study_reader_speech_rate'
   };
 
   const DEFAULT_STATE = {
     theme: 'dark',
     width: 'comfortable',
-    scale: 100 // percent
+    scale: 100, // percent
+    speechRate: 1.25
   };
 
   const SCALE_MIN = 70;
@@ -24,6 +26,15 @@
   const SCALE_STEP = 10;
 
   let currentScale = DEFAULT_STATE.scale;
+
+  // --- Read Aloud State ---
+  const speechSupported = ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window);
+  let speechState = 'idle'; // 'idle' | 'speaking' | 'paused'
+  let speechRate = DEFAULT_STATE.speechRate;
+  let currentVoice = null;
+  let speechChunks = []; // Array of { element: HTMLElement, text: string }
+  let currentChunkIndex = 0;
+  let isManualCancel = false;
 
   // --- DOM Elements ---
   const htmlRoot = document.documentElement;
@@ -50,6 +61,15 @@
   const metaWordCount = document.getElementById('metaWordCount');
   const metaReadTime = document.getElementById('metaReadTime');
 
+  // Read Aloud Elements
+  const readAloudPlayBtn = document.getElementById('readAloudPlayBtn');
+  const readAloudStopBtn = document.getElementById('readAloudStopBtn');
+  const readAloudBtnText = document.getElementById('readAloudBtnText');
+  const speechRateSelect = document.getElementById('speechRateSelect');
+  const voiceBadge = document.getElementById('voiceBadge');
+  const playIcon = document.getElementById('playIcon');
+  const pauseIcon = document.getElementById('pauseIcon');
+
   // --- Initialize Settings from LocalStorage ---
   function initSettings() {
     // Theme
@@ -68,6 +88,20 @@
       currentScale = DEFAULT_STATE.scale;
     }
     updateFontScale(currentScale);
+
+    // Speech Rate
+    const savedRate = parseFloat(localStorage.getItem(STORAGE_KEYS.SPEECH_RATE));
+    if (!isNaN(savedRate) && savedRate >= 0.5 && savedRate <= 3) {
+      speechRate = savedRate;
+      if (speechRateSelect) {
+        speechRateSelect.value = savedRate.toString();
+      }
+    } else {
+      speechRate = DEFAULT_STATE.speechRate;
+    }
+
+    // Init voices
+    initSpeechVoices();
   }
 
   // --- Theme Management ---
@@ -125,6 +159,287 @@
     updateFontScale(currentScale + delta);
   }
 
+  // --- Read Aloud Speech Synthesis Engine ---
+  function scoreVoice(voice) {
+    const name = (voice.name || '').toLowerCase();
+    const lang = (voice.lang || '').toLowerCase();
+    let score = 0;
+
+    // Prefer English
+    const isEn = lang.startsWith('en');
+    if (isEn) score += 10;
+
+    // Microsoft Edge Aria Online / Natural voice (Highest priority)
+    if (name.includes('aria')) {
+      score += 100;
+      if (name.includes('natural') || name.includes('online')) {
+        score += 50;
+      }
+    }
+
+    // Other Natural / Online / Neural voices
+    if (name.includes('natural') || name.includes('online') || name.includes('neural')) {
+      score += 30;
+    }
+    // Microsoft voices
+    if (name.includes('microsoft')) {
+      score += 20;
+    }
+    // Google or Apple high quality voices
+    if (name.includes('google') || name.includes('samantha') || name.includes('siri')) {
+      score += 15;
+    }
+    if (voice.default) {
+      score += 5;
+    }
+
+    return score;
+  }
+
+  function updateVoiceList() {
+    if (!speechSupported) {
+      if (voiceBadge) {
+        voiceBadge.textContent = 'Off';
+        voiceBadge.title = 'Web Speech API not supported in this browser';
+      }
+      return;
+    }
+
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return;
+
+    let bestVoice = voices[0];
+    let bestScore = -1;
+
+    voices.forEach(v => {
+      const score = scoreVoice(v);
+      if (score > bestScore) {
+        bestScore = score;
+        bestVoice = v;
+      }
+    });
+
+    currentVoice = bestVoice;
+
+    if (voiceBadge && currentVoice) {
+      const vName = currentVoice.name || '';
+      if (vName.toLowerCase().includes('aria')) {
+        voiceBadge.textContent = 'Aria (Natural)';
+        voiceBadge.title = `Using high-fidelity voice: ${vName}`;
+        voiceBadge.classList.add('aria-active');
+      } else {
+        // Clean short label
+        const cleanName = vName
+          .replace(/Microsoft|Google|English|United States|Natural|Online|Desktop|\(.*?\)/gi, '')
+          .trim() || vName.split(' ')[0] || 'English';
+        voiceBadge.textContent = cleanName.slice(0, 14);
+        voiceBadge.title = `Using voice: ${vName} (${currentVoice.lang})`;
+        voiceBadge.classList.remove('aria-active');
+      }
+    }
+  }
+
+  function initSpeechVoices() {
+    if (!speechSupported) {
+      if (voiceBadge) {
+        voiceBadge.textContent = 'No Voice';
+        voiceBadge.title = 'Speech synthesis unavailable';
+      }
+      return;
+    }
+
+    updateVoiceList();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = updateVoiceList;
+    }
+  }
+
+  function extractSpeechChunks() {
+    speechChunks = [];
+    if (!readerContent) return;
+
+    // Target semantic leaf block elements
+    const candidateSelector = 'h1, h2, h3, h4, h5, h6, p, blockquote, pre, li, dt, dd, figcaption, tr';
+    const candidates = Array.from(readerContent.querySelectorAll(candidateSelector));
+
+    // Filter out parent wrappers so we never read both parent and child
+    const filtered = candidates.filter(el => {
+      const hasChildCandidate = candidates.some(other => other !== el && el.contains(other));
+      if (hasChildCandidate) return false;
+
+      const txt = (el.textContent || '').trim();
+      return txt.length > 0;
+    });
+
+    speechChunks = filtered.map(el => ({
+      element: el,
+      text: (el.textContent || '').replace(/\s+/g, ' ').trim()
+    }));
+  }
+
+  function setSpeechState(state) {
+    speechState = state;
+    if (!readAloudPlayBtn) return;
+
+    if (state === 'speaking') {
+      readAloudPlayBtn.classList.add('speaking');
+      readAloudPlayBtn.classList.remove('paused');
+      if (readAloudBtnText) readAloudBtnText.textContent = 'Pause';
+      if (readAloudStopBtn) readAloudStopBtn.disabled = false;
+      if (playIcon) playIcon.style.display = 'none';
+      if (pauseIcon) pauseIcon.style.display = 'block';
+    } else if (state === 'paused') {
+      readAloudPlayBtn.classList.remove('speaking');
+      readAloudPlayBtn.classList.add('paused');
+      if (readAloudBtnText) readAloudBtnText.textContent = 'Resume';
+      if (readAloudStopBtn) readAloudStopBtn.disabled = false;
+      if (playIcon) playIcon.style.display = 'block';
+      if (pauseIcon) pauseIcon.style.display = 'none';
+    } else { // idle
+      readAloudPlayBtn.classList.remove('speaking', 'paused');
+      if (readAloudBtnText) readAloudBtnText.textContent = 'Read';
+      if (readAloudStopBtn) readAloudStopBtn.disabled = true;
+      if (playIcon) playIcon.style.display = 'block';
+      if (pauseIcon) pauseIcon.style.display = 'none';
+      clearSpeechHighlight();
+    }
+  }
+
+  function highlightCurrentChunk(index) {
+    clearSpeechHighlight();
+    if (index >= 0 && index < speechChunks.length) {
+      const chunk = speechChunks[index];
+      if (chunk && chunk.element) {
+        chunk.element.classList.add('speech-highlight');
+        try {
+          chunk.element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (e) {
+          // Ignore scroll errors
+        }
+      }
+    }
+  }
+
+  function clearSpeechHighlight() {
+    if (!readerContent) return;
+    const highlighted = readerContent.querySelectorAll('.speech-highlight');
+    highlighted.forEach(el => el.classList.remove('speech-highlight'));
+  }
+
+  function speakCurrentChunk() {
+    if (!speechSupported) return;
+
+    if (currentChunkIndex < 0 || currentChunkIndex >= speechChunks.length) {
+      stopReading();
+      return;
+    }
+
+    const chunk = speechChunks[currentChunkIndex];
+    highlightCurrentChunk(currentChunkIndex);
+
+    const utterance = new SpeechSynthesisUtterance(chunk.text);
+    if (currentVoice) {
+      utterance.voice = currentVoice;
+    }
+    utterance.rate = speechRate;
+    utterance.pitch = 1.0;
+
+    utterance.onend = () => {
+      if (speechState === 'speaking' && !isManualCancel) {
+        currentChunkIndex++;
+        if (currentChunkIndex < speechChunks.length) {
+          speakCurrentChunk();
+        } else {
+          stopReading();
+        }
+      }
+    };
+
+    utterance.onerror = (e) => {
+      if (e.error === 'canceled' || e.error === 'interrupted') return;
+      console.warn('SpeechSynthesis error:', e);
+      if (speechState === 'speaking' && !isManualCancel) {
+        currentChunkIndex++;
+        speakCurrentChunk();
+      }
+    };
+
+    setSpeechState('speaking');
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function playOrPauseReading() {
+    if (!speechSupported) {
+      showToast('Speech synthesis is not supported in your browser.', true);
+      return;
+    }
+
+    if (readerContainer.hidden || !readerContent || readerContent.textContent.trim().length === 0) {
+      showToast('Open an HTML study document first to start Read Aloud.', true);
+      return;
+    }
+
+    if (speechState === 'speaking') {
+      window.speechSynthesis.pause();
+      setSpeechState('paused');
+      return;
+    }
+
+    if (speechState === 'paused') {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+        setSpeechState('speaking');
+      } else {
+        // Fallback for browsers that fail on resume()
+        isManualCancel = true;
+        window.speechSynthesis.cancel();
+        isManualCancel = false;
+        speakCurrentChunk();
+      }
+      return;
+    }
+
+    // Start from beginning or current position
+    if (speechChunks.length === 0) {
+      extractSpeechChunks();
+    }
+
+    if (speechChunks.length === 0) {
+      showToast('No readable text found in this document.', true);
+      return;
+    }
+
+    currentChunkIndex = 0;
+    isManualCancel = false;
+    speakCurrentChunk();
+  }
+
+  function stopReading() {
+    isManualCancel = true;
+    if (speechSupported) {
+      window.speechSynthesis.cancel();
+    }
+    isManualCancel = false;
+    currentChunkIndex = 0;
+    setSpeechState('idle');
+  }
+
+  function changeSpeechRate(newRate) {
+    speechRate = parseFloat(newRate) || 1.25;
+    try {
+      localStorage.setItem(STORAGE_KEYS.SPEECH_RATE, speechRate.toString());
+    } catch (e) {
+      // Storage unavailable
+    }
+
+    if (speechState === 'speaking') {
+      isManualCancel = true;
+      window.speechSynthesis.cancel();
+      isManualCancel = false;
+      speakCurrentChunk();
+    }
+  }
+
   // --- Toast Messages ---
   let toastTimeout = null;
   function showToast(message, isError = true) {
@@ -171,6 +486,7 @@
     }
 
     hideToast();
+    stopReading(); // Halt ongoing speech before opening new document
 
     const reader = new FileReader();
     reader.onload = function (e) {
@@ -188,6 +504,8 @@
   // --- HTML Parsing, Sanitization & Content Extraction ---
   function processHtmlContent(rawHtml, filename) {
     try {
+      stopReading();
+
       const parser = new DOMParser();
       const doc = parser.parseFromString(rawHtml, 'text/html');
 
@@ -213,6 +531,9 @@
 
       // Post-process: wrap tables for horizontal scroll
       wrapTables(readerContent);
+
+      // Extract speech chunks for reading aloud
+      extractSpeechChunks();
 
       // Update Header info & Document Metadata
       currentFileName.textContent = filename;
@@ -525,6 +846,26 @@
       });
     });
 
+    // Read Aloud triggers
+    if (readAloudPlayBtn) {
+      readAloudPlayBtn.addEventListener('click', playOrPauseReading);
+    }
+    if (readAloudStopBtn) {
+      readAloudStopBtn.addEventListener('click', stopReading);
+    }
+    if (speechRateSelect) {
+      speechRateSelect.addEventListener('change', (e) => {
+        changeSpeechRate(e.target.value);
+      });
+    }
+
+    // Cancel speech on page unload
+    window.addEventListener('beforeunload', () => {
+      if (speechSupported) {
+        window.speechSynthesis.cancel();
+      }
+    });
+
     // Toast dismiss
     toastCloseBtn.addEventListener('click', hideToast);
 
@@ -535,9 +876,12 @@
         e.preventDefault();
         triggerFileSelect();
       }
-      // Escape to close toast
+      // Escape to close toast or stop reading
       if (e.key === 'Escape') {
         hideToast();
+        if (speechState !== 'idle') {
+          stopReading();
+        }
       }
     });
   }

@@ -58,6 +58,36 @@
         <button type="button" class="seg-btn" data-width-val="wide" id="widthWideBtn" title="Wide column width">Wide</button>
       </div>
 
+      <!-- Read Aloud Controls -->
+      <div class="control-group read-aloud-group" role="group" aria-label="Read Aloud Controls" id="readAloudGroup">
+        <button type="button" class="btn btn-read-aloud" id="readAloudPlayBtn" title="Read Aloud (Play / Pause)" aria-label="Read Aloud">
+          <svg class="play-icon" id="playIcon" viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <svg class="pause-icon" id="pauseIcon" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:none;">
+            <rect x="6" y="4" width="4" height="16"/>
+            <rect x="14" y="4" width="4" height="16"/>
+          </svg>
+          <span class="btn-text" id="readAloudBtnText">Read</span>
+        </button>
+        <button type="button" class="icon-btn stop-btn" id="readAloudStopBtn" title="Stop reading" aria-label="Stop reading" disabled>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+            <rect x="5" y="5" width="14" height="14" rx="1.5"/>
+          </svg>
+        </button>
+        <div class="speed-select-wrap" title="Reading Speed">
+          <select class="speed-select" id="speechRateSelect" aria-label="Speech rate">
+            <option value="0.75">0.75×</option>
+            <option value="1">1×</option>
+            <option value="1.25" selected>1.25×</option>
+            <option value="1.5">1.5×</option>
+            <option value="1.75">1.75×</option>
+            <option value="2">2×</option>
+          </select>
+        </div>
+        <span class="voice-badge" id="voiceBadge" title="Browser Speech Voice">Voice</span>
+      </div>
+
       <!-- Theme Toggle -->
       <button type="button" class="icon-btn theme-toggle-btn" id="themeToggleBtn" title="Toggle dark/light theme" aria-label="Toggle theme">
         <svg class="sun-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
