@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Corporate Finance Fundamentals — Study Guide</title>
+  <style>
+    /* Intentionally cramped / ugly raw styling from an exported legacy web page */
+    body { font-family: "Comic Sans MS", fantasy; background: #ffffcc; color: #880000; margin: 0; padding: 5px; }
+    .ugly-banner { background: red; color: yellow; font-size: 24px; font-weight: bold; }
+  </style>
+</head>
+<body style="width: 1400px; background-color: #fcf6d6;">
+  <div class="ugly-banner" style="padding: 10px;" onclick="alert('Malicious alert!')">
+    LEGACY EXPORTED STUDY NOTES - FINANCE 101
+  </div>
+
+  <h1>Corporate Finance &amp; Valuation Fundamentals</h1>
+  <p><strong>Corporate Finance</strong> focuses on how corporations deal with funding sources, capital structuring, accounting, and investment decisions. It seeks to maximize shareholder value through long and short-term financial planning.</p>
+
+  <script>
+    // This script must be completely stripped and NOT executed!
+    console.log("DANGEROUS INJECTED SCRIPT RUNNING");
+    window.maliciousCodeExecuted = true;
+  </script>
+
+  <h2>1. The Three Core Pillars of Corporate Finance</h2>
+  <ol>
+    <li>
+      <strong>Capital Budgeting:</strong> The process of planning and managing a firm's long-term investments. Involves evaluating cash flow timing, magnitude, and risk.
+    </li>
+    <li>
+      <strong>Capital Structure:</strong> The specific mixture of long-term debt and equity the firm uses to finance its operations.
+    </li>
+    <li>
+      <strong>Working Capital Management:</strong> Managing short-term assets (inventory, receivables) and short-term liabilities (payables, short-term debt).
+    </li>
+  </ol>
+
+  <h2>2. Key Financial Valuation Metrics</h2>
+  <p>When assessing the economic health and intrinsic value of an enterprise, analysts rely on standard valuation metrics and discounted cash flow (DCF) techniques.</p>
+
+  <table border="1" cellpadding="8" style="background: pink; border: 3px solid green;">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Formula / Definition</th>
+        <th>Application</th>
+        <th>Typical Benchmark</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Net Present Value (NPV)</strong></td>
+        <td><code>NPV = Σ [ CFt / (1 + r)^t ] - Initial Outlay</code></td>
+        <td>Capital project selection</td>
+        <td>NPV &gt; 0 (Accept project)</td>
+      </tr>
+      <tr>
+        <td><strong>Internal Rate of Return (IRR)</strong></td>
+        <td>Discount rate where <code>NPV = 0</code></td>
+        <td>Expected annualized yield</td>
+        <td>IRR &gt; Hurdle Rate (WACC)</td>
+      </tr>
+      <tr>
+        <td><strong>Weighted Average Cost of Capital (WACC)</strong></td>
+        <td><code>(E/V * Re) + (D/V * Rd * (1 - T))</code></td>
+        <td>Firm discount rate</td>
+        <td>Industry dependent (6% - 12%)</td>
+      </tr>
+      <tr>
+        <td><strong>Free Cash Flow to Firm (FCFF)</strong></td>
+        <td><code>EBIT*(1-t) + D&amp;A - CapEx - ΔNWC</code></td>
+        <td>Intrinsic equity valuation</td>
+        <td>Positive, sustained expansion</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>3. Discounted Cash Flow (DCF) Valuation Implementation</h2>
+  <p>Below is a clean Python snippet used in financial modeling to calculate the Enterprise Value from projected cash flows:</p>
+
+  <pre><code class="language-python">def calculate_enterprise_value(cash_flows, wacc, terminal_growth_rate):
+    """
+    Computes Enterprise Value using 2-stage Discounted Cash Flow (DCF).
+    """
+    discounted_cfs = []
+    for t, cf in enumerate(cash_flows, start=1):
+        pv = cf / ((1 + wacc) ** t)
+        discounted_cfs.append(pv)
+
+    # Terminal Value using Gordon Growth Model
+    last_cf = cash_flows[-1]
+    terminal_val = (last_cf * (1 + terminal_growth_rate)) / (wacc - terminal_growth_rate)
+    pv_terminal = terminal_val / ((1 + wacc) ** len(cash_flows))
+
+    enterprise_value = sum(discounted_cfs) + pv_terminal
+    return round(enterprise_value, 2)
+
+# Example: 5-year forecast ($M), 8.5% WACC, 2.5% perpetual growth
+forecast_cf = [120, 145, 170, 200, 235]
+ev = calculate_enterprise_value(forecast_cf, 0.085, 0.025)
+print(f"Calculated Enterprise Value: ${ev:,.2f}M")
+</code></pre>
+
+  <blockquote>
+    <p>"Price is what you pay. Value is what you get. In the short run, the market is a voting machine, but in the long run, it is a weighing machine." — Benjamin Graham</p>
+  </blockquote>
+
+  <h2>4. Summary Comparison: Debt vs Equity Financing</h2>
+  <ul>
+    <li><strong>Debt Financing:</strong>
+      <ul>
+        <li>Lower cost of capital due to interest tax-shield.</li>
+        <li>Requires mandatory periodic interest and principal payments.</li>
+        <li>Increases financial distress risk if leverage is too high.</li>
+      </ul>
+    </li>
+    <li><strong>Equity Financing:</strong>
+      <ul>
+        <li>No mandatory fixed cash outflows (dividends are discretionary).</li>
+        <li>Dilutes ownership and voting control.</li>
+        <li>Higher cost of capital due to equity risk premium.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <hr>
+  <p><small>Study Note Reference: For more information on corporate finance, visit <a href="https://en.wikipedia.org/wiki/Corporate_finance" target="_blank">Wikipedia Corporate Finance</a> or check standard texts.</small></p>
+</body>
+</html>
