@@ -163,28 +163,35 @@
   const EXACT_ARIA_VOICE_NAME = 'Microsoft Aria Online (Natural) - English (United States)';
 
   /**
-   * Evaluates available voices and selects the optimal voice following strict hierarchy:
-   * 1. Exact "Microsoft Aria Online (Natural) - English (United States)"
-   * 2. Any Aria Online/Natural English voice (if naming format varies slightly)
-   * 3. Any Aria English voice
-   * 4. Other Microsoft Online/Natural English voices (Jenny, Guy, Andrew, Emma, etc.)
-   * 5. Other Natural/Online/Neural English voices
-   * 6. Other Microsoft English voices
-   * 7. Any other English voice
-   * 8. Browser default voice
-   * 9. First available voice
+   * Resolves the target Microsoft Aria voice from a SpeechSynthesisVoice array.
+   * Priority:
+   * 1. Exact match for "Microsoft Aria Online (Natural) - English (United States)" with en-US/en-* and localService === false
+   * 2. Exact match for "Microsoft Aria Online (Natural) - English (United States)" by name or voiceURI
+   * 3. Any Aria Online/Natural English voice
+   * 4. Any Aria English voice
+   * 5. Other Microsoft Online/Natural English voices (Jenny, Guy, Andrew, Emma, etc.)
+   *
+   * IMPORTANT: Never silently falls back to local Microsoft desktop voices (e.g. David, Zira).
    */
-  function findBestVoice(voices) {
+  function resolveAriaVoice(voices) {
     if (!voices || voices.length === 0) return null;
 
-    // 1. Exact match for Microsoft Aria Online (Natural) - English (United States)
+    // 1. Exact match: Microsoft Aria Online (Natural) - English (United States) (en-US, online)
+    const exactAriaOnline = voices.find(v =>
+      (v.name === EXACT_ARIA_VOICE_NAME || v.voiceURI === EXACT_ARIA_VOICE_NAME) &&
+      (v.lang === 'en-US' || (v.lang && v.lang.toLowerCase().startsWith('en'))) &&
+      v.localService === false
+    );
+    if (exactAriaOnline) return exactAriaOnline;
+
+    // 2. Exact match by name or voiceURI without localService constraint
     const exactAria = voices.find(v =>
       (v.name === EXACT_ARIA_VOICE_NAME || v.voiceURI === EXACT_ARIA_VOICE_NAME) &&
       (v.lang === 'en-US' || (v.lang && v.lang.toLowerCase().startsWith('en')))
     );
     if (exactAria) return exactAria;
 
-    // 2. Any Aria Natural / Online English voice
+    // 3. Any Aria Natural / Online English voice
     const ariaNatural = voices.find(v => {
       const n = (v.name || '').toLowerCase();
       const l = (v.lang || '').toLowerCase();
@@ -192,7 +199,7 @@
     });
     if (ariaNatural) return ariaNatural;
 
-    // 3. Any Aria English voice
+    // 4. Any Aria English voice
     const anyAriaEn = voices.find(v => {
       const n = (v.name || '').toLowerCase();
       const l = (v.lang || '').toLowerCase();
@@ -200,7 +207,7 @@
     });
     if (anyAriaEn) return anyAriaEn;
 
-    // 4. Other Microsoft Online/Natural English voices (Jenny, Guy, Andrew, Emma, etc.)
+    // 5. Other Microsoft Online/Natural English voices (Jenny, Guy, Andrew, Emma, etc.)
     const msOnlineNaturalEn = voices.find(v => {
       const n = (v.name || '').toLowerCase();
       const l = (v.lang || '').toLowerCase();
@@ -208,100 +215,87 @@
     });
     if (msOnlineNaturalEn) return msOnlineNaturalEn;
 
-    // 5. Any other Natural / Online / Neural English voices
-    const otherNaturalEn = voices.find(v => {
-      const n = (v.name || '').toLowerCase();
-      const l = (v.lang || '').toLowerCase();
-      return (n.includes('natural') || n.includes('online') || n.includes('neural')) && l.startsWith('en');
-    });
-    if (otherNaturalEn) return otherNaturalEn;
+    // Explicitly refuse local SAPI voices (David, Zira) - do not silently fallback to David
+    return null;
+  }
 
-    // 6. Other Microsoft English voices (e.g. David Desktop, Zira Desktop)
-    const msEn = voices.find(v => {
-      const n = (v.name || '').toLowerCase();
-      const l = (v.lang || '').toLowerCase();
-      return n.includes('microsoft') && l.startsWith('en');
-    });
-    if (msEn) return msEn;
+  function updateVoiceBadge(voice) {
+    if (!voiceBadge) return;
 
-    // 7. Any other English voice
-    const anyEn = voices.find(v => (v.lang || '').toLowerCase().startsWith('en'));
-    if (anyEn) return anyEn;
+    if (!speechSupported) {
+      voiceBadge.textContent = 'Off';
+      voiceBadge.title = 'Web Speech API not supported in this browser';
+      voiceBadge.classList.remove('aria-active');
+      return;
+    }
 
-    // 8. Browser default voice
-    const defVoice = voices.find(v => v.default);
-    if (defVoice) return defVoice;
+    if (!voice) {
+      voiceBadge.textContent = 'No Aria';
+      voiceBadge.title = 'Microsoft Aria voice is loading or unavailable';
+      voiceBadge.classList.remove('aria-active');
+      return;
+    }
 
-    // 9. First available voice
-    return voices[0];
+    const vName = voice.name || '';
+    const vNameLower = vName.toLowerCase();
+
+    if (vNameLower.includes('aria')) {
+      voiceBadge.textContent = 'Aria Online';
+      voiceBadge.title = `${voice.name} (${voice.lang})`;
+      voiceBadge.classList.add('aria-active');
+    } else if (vNameLower.includes('online') || vNameLower.includes('natural')) {
+      const cleanName = vName
+        .replace(/Microsoft|English|United States|\(.*?\)/gi, '')
+        .trim() || 'Natural';
+      voiceBadge.textContent = cleanName.slice(0, 14);
+      voiceBadge.title = `${voice.name} (${voice.lang})`;
+      voiceBadge.classList.remove('aria-active');
+    } else {
+      const cleanName = vName
+        .replace(/Microsoft|Google|English|United States|Natural|Online|Desktop|\(.*?\)/gi, '')
+        .trim() || vName.split(' ')[0] || 'Voice';
+      voiceBadge.textContent = cleanName.slice(0, 14);
+      voiceBadge.title = `${voice.name} (${voice.lang})`;
+      voiceBadge.classList.remove('aria-active');
+    }
   }
 
   function updateVoiceList() {
     if (!speechSupported) {
+      updateVoiceBadge(null);
+      return;
+    }
+
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) {
       if (voiceBadge) {
-        voiceBadge.textContent = 'Off';
-        voiceBadge.title = 'Web Speech API not supported in this browser';
+        voiceBadge.textContent = 'Loading...';
+        voiceBadge.title = 'Loading browser voice list...';
         voiceBadge.classList.remove('aria-active');
       }
       return;
     }
 
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices || voices.length === 0) return;
-
-    const bestVoice = findBestVoice(voices);
-    if (!bestVoice) return;
-
-    currentVoice = bestVoice;
-
-    if (voiceBadge && currentVoice) {
-      const vName = currentVoice.name || '';
-      const vNameLower = vName.toLowerCase();
-
-      if (vNameLower.includes('aria')) {
-        voiceBadge.textContent = 'Aria Online';
-        voiceBadge.title = `${currentVoice.name} (${currentVoice.lang})`;
-        voiceBadge.classList.add('aria-active');
-      } else if (vNameLower.includes('online') || vNameLower.includes('natural')) {
-        const cleanName = vName
-          .replace(/Microsoft|English|United States|\(.*?\)/gi, '')
-          .trim() || 'Natural';
-        voiceBadge.textContent = cleanName.slice(0, 14);
-        voiceBadge.title = `${currentVoice.name} (${currentVoice.lang})`;
-        voiceBadge.classList.remove('aria-active');
-      } else {
-        // Clean short label
-        const cleanName = vName
-          .replace(/Microsoft|Google|English|United States|Natural|Online|Desktop|\(.*?\)/gi, '')
-          .trim() || vName.split(' ')[0] || 'English';
-        voiceBadge.textContent = cleanName.slice(0, 14);
-        voiceBadge.title = `${currentVoice.name} (${currentVoice.lang})`;
-        voiceBadge.classList.remove('aria-active');
-      }
+    const ariaVoice = resolveAriaVoice(voices);
+    if (ariaVoice) {
+      currentVoice = ariaVoice;
+      updateVoiceBadge(ariaVoice);
+    } else {
+      currentVoice = null;
+      updateVoiceBadge(null);
     }
   }
 
   function initSpeechVoices() {
     if (!speechSupported) {
-      if (voiceBadge) {
-        voiceBadge.textContent = 'No Voice';
-        voiceBadge.title = 'Speech synthesis unavailable';
-      }
+      updateVoiceBadge(null);
       return;
     }
 
     updateVoiceList();
 
-    // Register both listener styles to ensure browser event triggers
+    // Exactly one voiceschanged event handler to prevent duplicate listeners
     window.speechSynthesis.addEventListener('voiceschanged', updateVoiceList);
-    if ('onvoiceschanged' in window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = updateVoiceList;
-    }
-
-    // Polled retries in case voices load asynchronously without immediate event dispatch
-    setTimeout(updateVoiceList, 100);
-    setTimeout(updateVoiceList, 400);
-    setTimeout(updateVoiceList, 1200);
   }
 
   function extractSpeechChunks() {
@@ -384,16 +378,28 @@
       return;
     }
 
+    // Authoritative check at playback time: query voices freshly
+    const voices = window.speechSynthesis.getVoices();
+    const activeVoice = resolveAriaVoice(voices) || currentVoice;
+
+    if (!activeVoice) {
+      showToast('Microsoft Aria voice is not available. Please wait for voice list to populate.', true);
+      stopReading();
+      updateVoiceBadge(null);
+      return;
+    }
+
+    // Keep active voice reference synchronized
+    currentVoice = activeVoice;
+    updateVoiceBadge(activeVoice);
+
     const chunk = speechChunks[currentChunkIndex];
     highlightCurrentChunk(currentChunkIndex);
 
+    // Create fresh utterance for this chunk and explicitly assign the exact Aria voice
     const utterance = new SpeechSynthesisUtterance(chunk.text);
-    if (currentVoice) {
-      utterance.voice = currentVoice;
-      utterance.lang = currentVoice.lang || 'en-US';
-    } else {
-      utterance.lang = 'en-US';
-    }
+    utterance.voice = activeVoice;
+    utterance.lang = activeVoice.lang || 'en-US';
     utterance.rate = speechRate;
     utterance.pitch = 1.0;
 
@@ -461,6 +467,34 @@
       showToast('No readable text found in this document.', true);
       return;
     }
+
+    // Explicitly query voices at playback trigger time
+    const voices = window.speechSynthesis.getVoices();
+    const activeVoice = resolveAriaVoice(voices);
+
+    if (!activeVoice) {
+      // Voices may still be populating asynchronously; wait briefly and retry
+      showToast('Waiting for Microsoft Aria voice to load...', false);
+      setTimeout(() => {
+        const retryVoices = window.speechSynthesis.getVoices();
+        const retryVoice = resolveAriaVoice(retryVoices);
+        if (retryVoice) {
+          currentVoice = retryVoice;
+          updateVoiceBadge(retryVoice);
+          hideToast();
+          currentChunkIndex = 0;
+          isManualCancel = false;
+          speakCurrentChunk();
+        } else {
+          showToast('Microsoft Aria voice is not available in this browser.', true);
+          updateVoiceBadge(null);
+        }
+      }, 350);
+      return;
+    }
+
+    currentVoice = activeVoice;
+    updateVoiceBadge(activeVoice);
 
     currentChunkIndex = 0;
     isManualCancel = false;
