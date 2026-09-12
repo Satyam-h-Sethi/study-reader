@@ -1,47 +1,96 @@
 # Study Reader
 
-A lightweight, distraction-free HTML study document viewer designed for reading long educational materials, study guides, finance notes, and exported web pages with high-contrast, Obsidian-style typography.
+[![Live Demo](https://img.shields.io/badge/Live_Demo-study.satyamsethi.dpdns.org-3b82f6?style=for-the-badge&logo=cloudflare&logoColor=white)](https://study.satyamsethi.dpdns.org)
+[![Cloudflare Pages](https://img.shields.io/badge/Cloudflare_Pages-study--reader.pages.dev-F38020?style=for-the-badge&logo=cloudflarepages&logoColor=white)](https://study-reader.pages.dev)
+[![GitHub](https://img.shields.io/badge/GitHub-Satyam--h--Sethi%2Fstudy--reader-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Satyam-h-Sethi/study-reader)
+
+A lightweight, distraction-free HTML study-material reader designed for reading long technical notes, financial documents, and educational exports with high-readability typography.
+
+## Author
+
+**Satyam Sethi**  
+GitHub: [@Satyam-h-Sethi](https://github.com/Satyam-h-Sethi)
+
+## Live Web Preview
+
+- **Cloudflare Pages Direct**: [https://study-reader.pages.dev](https://study-reader.pages.dev)
+- **Primary Custom Domain**: [https://study.satyamsethi.dpdns.org](https://study.satyamsethi.dpdns.org) *(Configured on Cloudflare Pages; pending external DNS CNAME propagation)*
+- **GitHub Repository**: [https://github.com/Satyam-h-Sethi/study-reader](https://github.com/Satyam-h-Sethi/study-reader)
 
 ## What It Does
 
-- **Cleans & Sanitizes**: Parses raw `.html` / `.htm` study files and neutralizes legacy styling, scripts, inline event handlers, and distracting page clutter.
-- **Calm Reading Interface**: Default dark theme with a polished light theme alternative.
-- **Reading Width Control**: 3 column width modes (Compact, Comfortable, Wide) stored in `localStorage`.
-- **Text Scaling**: Quick `A-` / `A+` font scaling (70% to 160%) stored in `localStorage`.
-- **Semantic Structure**: Beautiful formatting for headings, tables (with horizontal scrolling), code blocks, blockquotes, lists, and images.
-- **Zero Copy Required**: Keeps your study files wherever they already reside on your computer. Open via native file picker or drag-and-drop.
-- **Back to Top**: Smooth floating button for navigating long study guides.
+Study Reader allows you to select any local `.html` or `.htm` document from your computer and immediately view its contents in a clean, high-contrast, developer-documentation reading environment.
 
-## How to Run
+It neutralizes legacy, inconsistent, or cramped webpage styles while stripping executable scripts and inline event handlers for a secure, calm reading experience.
 
-Study Reader is a 100% static application with zero external dependencies, no build steps, and no frameworks.
+## Why
 
-### Method 1: Local HTTP Server (Recommended)
+Many educational guides, exported reference docs, and technical study materials are formatted as standalone HTML files. While their information is valuable, their original styling is often noisy, cramped, poorly scaled, or tiring on the eyes during extended study sessions.
 
-Run any lightweight static server from the project directory:
+Study Reader separates the underlying document structure from legacy presentation rules, rendering the content in a typography-focused layout optimized for focus and retention.
+
+## Features
+
+- **Local File Access**: Open `.html` and `.htm` files directly from your computer without uploading them to any remote server.
+- **Drag-and-Drop**: Drop files anywhere onto the reader interface for instant parsing.
+- **Dark Mode by Default**: Tailored dark theme inspired by modern developer documentation, with a one-click Light/Dark theme toggle.
+- **Reading Width Modes**: Switch between **Compact** (680px), **Comfortable** (860px), and **Wide** (1140px) reading layouts.
+- **Adjustable Font Size**: Fine-tune typography scaling from 70% to 160% via responsive `A-` / `A+` controls.
+- **Preference Persistence**: Theme, reading width, and zoom preferences persist automatically across sessions via `localStorage`.
+- **Enhanced Typography**: Polished typography and spacing for headings, blockquotes, lists, and images.
+- **Responsive Tables & Code Blocks**: Code snippets use high-contrast monospaced styling; tables automatically wrap in scrollable containers to protect layout bounds.
+- **HTML Sanitization**: DOM parser filters dangerous tags (`<script>`, `<iframe>`, `<style>`, `<form>`) and strips inline `on*` event handlers.
+- **Back-to-Top Navigation**: Smooth floating button for swift navigation through lengthy study documents.
+- **Zero Backend Required**: Fully client-side processing with zero third-party dependencies.
+
+## Usage
+
+### Local Quick Start
+
+Requires Node.js (v14+). Zero external npm packages required.
 
 ```bash
-# Node.js
-node server.js
+# Navigate to the project directory
+cd study-reader
 
-# Or Python 3
-python -m http.server 8000
+# Start the local server
+node server.js
 ```
 
-Then open your browser to:
+Open your browser to:
 **http://localhost:8000**
 
-### Method 2: Direct File Open
+*(Alternatively, you can open `index.html` directly in any modern web browser).*
 
-You can also double-click `index.html` directly in Windows File Explorer or open it in any modern web browser:
+### Reading a Document
+
+1. Click **Open File** (or drag and drop an `.html`/`.htm` file into the window).
+2. Use the top toolbar to adjust text size, switch reading width, or toggle dark/light theme.
+3. Use the floating **Back to Top** button to return to the document header.
+
+## Deployment
+
+Study Reader is deployed as a static site on **Cloudflare Pages**:
+
+- Production Branch: `main`
+- Build Output Directory: `/` (Static root)
+- Custom Hostname: `study.satyamsethi.dpdns.org` (CNAME target: `study-reader.pages.dev`)
+
+## Tech Stack
+
+- **HTML5**: Clean semantic layout structure and native file input handling.
+- **CSS3**: Modern CSS custom properties, responsive typography, and theme tokens.
+- **Vanilla JavaScript**: Native `DOMParser` tree walker, sanitization engine, and `localStorage` state management.
+- **Node.js**: Zero-dependency standard library HTTP static file server (`server.js`) for local development.
+
+## Project Structure
 
 ```
-file:///C:/SS/CODING-omniroute/index.html
+study-reader/
+├── index.html                  # Main application interface and header controls
+├── style.css                   # Dark/light theme design system and reader typography
+├── app.js                      # DOM parser, sanitizer, controls, and persistence logic
+├── server.js                   # Lightweight Node.js local development server
+├── Finance_Fundamentals.html   # Sample study document for local demonstration
+└── README.md                   # Project documentation
 ```
-
-## How to Use
-
-1. Click **Open Study File** (or press `Ctrl + O`), or drag-and-drop any `.html` / `.htm` file onto the browser window.
-2. The document will immediately render in a distraction-free layout.
-3. Adjust text size with **A−** / **A+**, toggle widths (**Compact** / **Comfortable** / **Wide**), or toggle **Light / Dark** mode.
-4. Click **Open File** anytime to switch documents without reloading.
