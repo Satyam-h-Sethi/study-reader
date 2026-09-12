@@ -595,6 +595,17 @@ body {
   color: var(--text-dim);
 }
 
+.kbd-hint {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 0.15rem 0.4rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-heading);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
 .badge-row {
   display: flex;
   gap: 0.4rem;
